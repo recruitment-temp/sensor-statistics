@@ -1,5 +1,24 @@
 # Sensor Statistics Task
 
+## Solution caveats
+
+There are a few caveats of this implementation.
+
+### 1. Files with no values
+From the description it's not too clear
+whether files containing no correct rows (neither `0`-`100` nor `NaN`) should be counted as processed or not.
+Since I've tried to create a solution easily extendable to other sources of data,
+like HTTP, Websocket, JMS etc., I'd chosen an implementation
+which does not count such files, however normally this would be something to cross-check with
+the business/product owner/product manager.
+
+### 2. Average calculation
+I've used a very crude, but exact approach of keeping the full sum and count
+to calculate average. I've used `BigInt` to avoid overflowing, but this certainly
+has a performance penalty. This would require a measurement to know
+what's the actual impact and whether it's negligible, on the other hand—maybe `Int`
+or `Long` would be more than sufficient. 
+
 Create a command line program that calculates statistics from humidity sensor data.
 
 ### Background story
@@ -72,24 +91,3 @@ s3,NaN,NaN,NaN
 - You're more than welcome to implement a purely functional solution using cats-effect, fs2 and/or ZIO to impress, 
   but this is not a mandatory requirement. 
 - Sensible tests are welcome
-
-
-# Solution description
-
-## Caveats
-There are a few caveats of this implementation.
-
-### 1. Files with no values
-From the description it's not too clear
-whether files containing no correct rows (neither `0`-`100` nor `NaN`) should be counted as processed or not.
-Since I've tried to create a solution easily extendable to other sources of data,
-like HTTP, Websocket, JMS etc., I'd chosen an implementation
-which does not count such files, however normally this would be something to cross-check with
-the business/product owner/product manager.
-
-### 2. Average calculation
-I've used a very crude, but exact approach of keeping the full sum and count
-to calculate average. I've used `Big`Int to avoid overflowing, but this certainly
-has a performance penalty. This would require a measurement to know
-what's the actual impact and whether it's negligible, on the other hand—maybe Int
-or Long would be more than sufficient. 
