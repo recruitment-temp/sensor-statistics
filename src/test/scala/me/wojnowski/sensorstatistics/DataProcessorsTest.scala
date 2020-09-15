@@ -2,6 +2,7 @@ package me.wojnowski.sensorstatistics
 
 import cats.effect.ContextShift
 import cats.effect.IO
+import cats.scalatest.EitherValues
 import org.scalatest.wordspec.AnyWordSpec
 import fs2.Stream
 import me.wojnowski.sensorstatistics.domain.Measurement
@@ -15,19 +16,20 @@ import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.ExecutionContext
 import scala.util.Random
+import cats.syntax.all._
 
-// TODO Decrease compile times by limiting usage of refined macros
-class DataProcessorsTest extends AnyWordSpec with Matchers {
+class DataProcessorsTest extends AnyWordSpec with Matchers with EitherValues {
 
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
   "Summary calculator" when {
     "processing data" should {
       "correctly calculate min, avg and max" in {
+
         val entries = List(
-          Entry(SourceId("1"), SensorId("s1"), Measurement.Value(60)),
-          Entry(SourceId("1"), SensorId("s1"), Measurement.Value(100)),
-          Entry(SourceId("1"), SensorId("s1"), Measurement.Value(50))
+          entry("1", "s1", 60),
+          entry("1", "s1", 100),
+          entry("1", "s1", 50)
         )
 
         val resultingSummaries =
@@ -40,16 +42,16 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
             .flatMap(_.data.map { case (_, summary) => summary })
 
         resultingSummaries should contain theSameElementsAs List(
-          SensorSummary(min = Measurement.Value(50), avg = Measurement.Value(70), max = Measurement.Value(100))
+          summary(min = 50, avg = 70, max = 100)
         )
       }
 
       "not take NaNs into account" in {
         val entries = List(
-          Entry(SourceId("1"), SensorId("s1"), Measurement.NaN),
-          Entry(SourceId("1"), SensorId("s1"), Measurement.Value(50)),
-          Entry(SourceId("1"), SensorId("s1"), Measurement.NaN),
-          Entry(SourceId("1"), SensorId("s1"), Measurement.NaN)
+          entry("1", "s1", Measurement.NaN),
+          entry("1", "s1", 50),
+          entry("1", "s1", Measurement.NaN),
+          entry("1", "s1", Measurement.NaN)
         )
 
         val resultingSummaries =
@@ -62,16 +64,16 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
             .flatMap(_.data.map { case (_, summary) => summary })
 
         resultingSummaries shouldBe List(
-          SensorSummary(min = Measurement.Value(50), avg = Measurement.Value(50), max = Measurement.Value(50))
+          summary(min = 50, avg = 50, max = 50)
         )
       }
 
       "return NaNs if all measurements were NaNs" in {
-        val entry = Entry(SourceId("1"), SensorId("s1"), Measurement.NaN)
+        val entries = List(entry("1", "s1", Measurement.NaN))
 
         val resultingSummaries =
           Stream
-            .emit[IO, Entry](entry)
+            .emits[IO, Entry](entries)
             .through(DataProcessors.calculateSummaries)
             .compile
             .toList
@@ -84,21 +86,21 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
       "calculate data per sensor" in {
         val entries = new Random(0).shuffle(
           List(
-            Entry(SourceId("1"), SensorId("s1"), Measurement.Value(11)),
-            Entry(SourceId("1"), SensorId("s1"), Measurement.Value(12)),
-            Entry(SourceId("1"), SensorId("s1"), Measurement.Value(13)),
-            Entry(SourceId("1"), SensorId("s1"), Measurement.Value(14)),
-            Entry(SourceId("1"), SensorId("s1"), Measurement.Value(15)),
-            Entry(SourceId("1"), SensorId("s2"), Measurement.Value(21)),
-            Entry(SourceId("1"), SensorId("s2"), Measurement.Value(22)),
-            Entry(SourceId("1"), SensorId("s2"), Measurement.Value(23)),
-            Entry(SourceId("1"), SensorId("s2"), Measurement.Value(24)),
-            Entry(SourceId("1"), SensorId("s2"), Measurement.Value(25)),
-            Entry(SourceId("1"), SensorId("s3"), Measurement.Value(31)),
-            Entry(SourceId("1"), SensorId("s3"), Measurement.Value(32)),
-            Entry(SourceId("1"), SensorId("s3"), Measurement.Value(33)),
-            Entry(SourceId("1"), SensorId("s3"), Measurement.Value(34)),
-            Entry(SourceId("1"), SensorId("s3"), Measurement.Value(35))
+            entry("1", "s1", 11),
+            entry("1", "s1", 12),
+            entry("1", "s1", 13),
+            entry("1", "s1", 14),
+            entry("1", "s1", 15),
+            entry("1", "s2", 21),
+            entry("1", "s2", 22),
+            entry("1", "s2", 23),
+            entry("1", "s2", 24),
+            entry("1", "s2", 25),
+            entry("1", "s3", 31),
+            entry("1", "s3", 32),
+            entry("1", "s3", 33),
+            entry("1", "s3", 34),
+            entry("1", "s3", 35)
           )
         )
 
@@ -112,9 +114,21 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
             .flatMap(_.data)
 
         resultingSummaries should contain theSameElementsAs List(
-          SensorId("s1") -> SensorSummary(min = Measurement.Value(11), avg = Measurement.Value(13), max = Measurement.Value(15)),
-          SensorId("s2") -> SensorSummary(min = Measurement.Value(21), avg = Measurement.Value(23), max = Measurement.Value(25)),
-          SensorId("s3") -> SensorSummary(min = Measurement.Value(31), avg = Measurement.Value(33), max = Measurement.Value(35))
+          SensorId("s1") -> summary(
+            min = 11,
+            avg = 13,
+            max = 15
+          ),
+          SensorId("s2") -> summary(
+            min = 21,
+            avg = 23,
+            max = 25
+          ),
+          SensorId("s3") -> summary(
+            min = 31,
+            avg = 33,
+            max = 35
+          )
         )
       }
     }
@@ -124,9 +138,21 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
     "processing data" should {
       "sort summaries by average, descending" in {
         val summaries = List(
-          SensorId("s1") -> SensorSummary(min = Measurement.Value(10), avg = Measurement.Value(40), max = Measurement.Value(90)),
-          SensorId("s2") -> SensorSummary(min = Measurement.Value(10), avg = Measurement.Value(50), max = Measurement.Value(90)),
-          SensorId("s3") -> SensorSummary(min = Measurement.Value(10), avg = Measurement.Value(60), max = Measurement.Value(90))
+          SensorId("s1") -> summary(
+            min = 10,
+            avg = 40,
+            max = 90
+          ),
+          SensorId("s2") -> summary(
+            min = 10,
+            avg = 50,
+            max = 90
+          ),
+          SensorId("s3") -> summary(
+            min = 10,
+            avg = 60,
+            max = 90
+          )
         )
 
         val resultingAverages = Stream(Metric.ResultPerSensor(summaries))
@@ -136,17 +162,25 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
           .flatMap(_.data.map { case (_, summary) => summary.avg })
 
         resultingAverages should contain theSameElementsInOrderAs List(
-          Measurement.Value(60),
-          Measurement.Value(50),
-          Measurement.Value(40)
+          60,
+          50,
+          40
         )
       }
 
       "sort them, leaving NaNs at the end" in {
         val summaries = List(
-          SensorId("s3") -> SensorSummary(min = Measurement.Value(10), avg = Measurement.Value(0), max = Measurement.Value(90)),
+          SensorId("s3") -> summary(
+            min = 10,
+            avg = 0,
+            max = 90
+          ),
           SensorId("s1") -> SensorSummary(min = Measurement.Value(10), avg = Measurement.NaN, max = Measurement.Value(90)),
-          SensorId("s2") -> SensorSummary(min = Measurement.Value(10), avg = Measurement.Value(100), max = Measurement.Value(90)),
+          SensorId("s2") -> summary(
+            min = 10,
+            avg = 100,
+            max = 90
+          ),
           SensorId("s3") -> SensorSummary(min = Measurement.Value(10), avg = Measurement.NaN, max = Measurement.Value(90))
         )
 
@@ -157,8 +191,8 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
           .flatMap(_.data.map { case (_, summary) => summary.avg })
 
         resultingAverages should contain theSameElementsInOrderAs List(
-          Measurement.Value(100),
-          Measurement.Value(0),
+          100,
+          0,
           Measurement.NaN,
           Measurement.NaN
         )
@@ -170,11 +204,11 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
     "processing data" should {
       "count successes and failures regardless of source and sensor" in {
         val entries = List(
-          Entry(SourceId("1"), SensorId("s3"), Measurement.NaN),
-          Entry(SourceId("2"), SensorId("s2"), Measurement.Value(50)),
-          Entry(SourceId("3"), SensorId("s1"), Measurement.NaN),
-          Entry(SourceId("4"), SensorId("s1"), Measurement.Value(70)),
-          Entry(SourceId("4"), SensorId("s1"), Measurement.Value(60))
+          entry("1", "s3", Measurement.NaN),
+          entry("2", "s2", 50),
+          entry("3", "s1", Measurement.NaN),
+          entry("4", "s1", 70),
+          entry("4", "s1", 60)
         )
 
         val resultingMetrics: List[Metric] =
@@ -211,11 +245,11 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
     "processing non-empty data" should {
       "count files" in {
         val entries = List(
-          Entry(SourceId("1"), SensorId("s3"), Measurement.NaN),
-          Entry(SourceId("2"), SensorId("s2"), Measurement.Value(50)),
-          Entry(SourceId("2"), SensorId("s1"), Measurement.NaN),
-          Entry(SourceId("3"), SensorId("s1"), Measurement.Value(70)),
-          Entry(SourceId("3"), SensorId("s1"), Measurement.Value(60))
+          entry("1", "s3", Measurement.NaN),
+          entry("2", "s2", 50),
+          entry("2", "s1", Measurement.NaN),
+          entry("3", "s1", 70),
+          entry("3", "s1", 60)
         )
 
         val resultingMetrics: List[Metric] =
@@ -254,11 +288,11 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
     "processing some files" should {
       "return all metrics, including sorted results per sensor" in {
         val entries = List(
-          Entry(SourceId("1"), SensorId("s3"), Measurement.NaN),
-          Entry(SourceId("2"), SensorId("s2"), Measurement.Value(50)),
-          Entry(SourceId("2"), SensorId("s1"), Measurement.NaN),
-          Entry(SourceId("3"), SensorId("s1"), Measurement.Value(70)),
-          Entry(SourceId("3"), SensorId("s1"), Measurement.Value(60))
+          entry("1", "s3", Measurement.NaN),
+          entry("2", "s2", 50),
+          entry("2", "s1", Measurement.NaN),
+          entry("3", "s1", 70),
+          entry("3", "s1", 60)
         )
 
         val resultingMetrics: List[Metric] =
@@ -274,8 +308,16 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
           Metric.MeasurementsProcessed(successful = 3, failed = 2),
           Metric.ResultPerSensor(
             List(
-              SensorId("s1") -> SensorSummary(min = Measurement.Value(60), avg = Measurement.Value(65), max = Measurement.Value(70)),
-              SensorId("s2") -> SensorSummary(min = Measurement.Value(50), avg = Measurement.Value(50), max = Measurement.Value(50)),
+              SensorId("s1") -> summary(
+                min = 60,
+                avg = 65,
+                max = 70
+              ),
+              SensorId("s2") -> summary(
+                min = 50,
+                avg = 50,
+                max = 50
+              ),
               SensorId("s3") -> SensorSummary(min = Measurement.NaN, avg = Measurement.NaN, max = Measurement.NaN)
             )
           )
@@ -303,4 +345,21 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
       }
     }
   }
+
+  def entry(sourceId: String, sensorId: String, measurement: Measurement): Entry =
+    (
+      SourceId.validate(sourceId),
+      SensorId.validate(sensorId)
+    ).mapN(Entry(_, _, measurement)).value
+
+  def entry(sourceId: String, sensorId: String, measurement: Int): Entry =
+    entry(sourceId, sensorId, measurement)
+
+  def summary(min: Int, avg: Int, max: Int): SensorSummary =
+    (
+      Measurement.ofInt(min),
+      Measurement.ofInt(avg),
+      Measurement.ofInt(max)
+    ).mapN(SensorSummary.apply).value
+
 }

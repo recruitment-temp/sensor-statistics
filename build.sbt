@@ -12,6 +12,7 @@ val versions = new {
   val cats = new {
     val core = "2.2.0"
     val effect = "2.2.0"
+    val scalatest = "3.0.8"
   }
 
   val monocle = "2.0.3"
@@ -46,7 +47,10 @@ val monocle = Seq(
 
 val refined = Seq("eu.timepit" %% "refined" % versions.refined)
 
-val scalatest = Seq("org.scalatest" %% "scalatest" % versions.scalatest % "test")
+val scalatest = Seq(
+  "org.scalatest" %% "scalatest" % versions.scalatest % "test",
+  "com.ironcorelabs" %% "cats-scalatest" % versions.cats.scalatest  % "test"
+)
 
 val logging = Seq(
   "io.chrisdavenport" %% "log4cats-slf4j" % versions.log4cats,

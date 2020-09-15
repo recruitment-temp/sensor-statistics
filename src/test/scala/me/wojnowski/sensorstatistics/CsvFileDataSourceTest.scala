@@ -1,27 +1,24 @@
 package me.wojnowski.sensorstatistics
 
-import java.nio.file.Paths
-
 import cats.effect.Blocker
 import cats.effect.ContextShift
 import cats.effect.IO
-import me.wojnowski.sensorstatistics.domain.SourceId
-import org.scalatest.freespec.AnyFreeSpec
 import eu.timepit.refined.auto._
-import fs2.Chunk
-import fs2.Pipe
-import org.scalatest.wordspec.AnyWordSpec
-
-import scala.concurrent.ExecutionContext
 import fs2.Stream
 import me.wojnowski.sensorstatistics.domain.Entry
 import me.wojnowski.sensorstatistics.domain.Measurement
 import me.wojnowski.sensorstatistics.domain.SensorId
+import me.wojnowski.sensorstatistics.domain.SourceId
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
-class CsvFileDataSourceTest extends AnyWordSpec with Matchers with CommonTestValues {
+import scala.concurrent.ExecutionContext
+
+class CsvFileDataSourceTest extends AnyWordSpec with Matchers {
   val blocker = Blocker.liftExecutionContext(ExecutionContext.global)
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+
+  val SourceId1 = SourceId("1")
 
   val dataSource = new CsvDataPreProcessor[IO]
 

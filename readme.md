@@ -82,7 +82,7 @@ There are a few caveats of this implementation.
 ### 1. Files with no values
 From the description it's not too clear
 whether files containing no correct rows (neither `0`-`100` nor `NaN`) should be counted as processed or not.
-As I tried to create a solution easily extendable to other sources of data,
+Since I've tried to create a solution easily extendable to other sources of data,
 like HTTP, Websocket, JMS etc., I'd chosen an implementation
 which does not count such files, however normally this would be something to cross-check with
 the business/product owner/product manager.

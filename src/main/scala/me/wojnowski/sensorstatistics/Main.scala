@@ -17,10 +17,6 @@ import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import scala.util.Try
 import scala.util.control.NoStackTrace
 
-/* TODO
- * Open questions:
- * - test compile times
- * */
 object Main extends IOApp {
   val MaxParallelFiles = 4
   val ChunkSize = 4096
