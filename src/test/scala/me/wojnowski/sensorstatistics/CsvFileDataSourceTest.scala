@@ -14,13 +14,11 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext
 
-class CsvFileDataSourceTest extends AnyWordSpec with Matchers {
+class CsvFileDataSourceTest extends AnyWordSpec with CommonTestValues with Matchers {
   val blocker = Blocker.liftExecutionContext(ExecutionContext.global)
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
-  val SourceId1 = SourceId("1")
-
-  val dataSource = new CsvDataPreProcessor[IO]
+  val dataSource = new CsvPreProcessor[IO]
 
   "CsvFileDataSource" should {
     "skip first, non-empty line" in {
@@ -38,8 +36,8 @@ class CsvFileDataSourceTest extends AnyWordSpec with Matchers {
           .unsafeRunSync()
 
       resultingEntries shouldBe List(
-        Entry(SourceId1, SensorId("s1"), Measurement.Value(50)),
-        Entry(SourceId1, SensorId("s2"), Measurement.NaN)
+        entry("1", "s1", 50),
+        entry("1", "s2", Measurement.NaN)
       )
     }
 
@@ -60,7 +58,7 @@ class CsvFileDataSourceTest extends AnyWordSpec with Matchers {
           .unsafeRunSync()
 
       resultingEntries shouldBe List(
-        Entry(SourceId1, SensorId("s1"), Measurement.Value(50))
+        entry("1", "s1", 50)
       )
     }
 
@@ -81,7 +79,7 @@ class CsvFileDataSourceTest extends AnyWordSpec with Matchers {
           .unsafeRunSync()
 
       resultingEntries shouldBe List(
-        Entry(SourceId1, SensorId("s1"), Measurement.Value(50))
+        entry("1", "s1", 50)
       )
     }
 
@@ -104,8 +102,8 @@ class CsvFileDataSourceTest extends AnyWordSpec with Matchers {
           .unsafeRunSync()
 
       resultingEntries shouldBe List(
-        Entry(SourceId1, SensorId("s1"), Measurement.Value(50)),
-        Entry(SourceId1, SensorId("s2"), Measurement.Value(30))
+        entry("1", "s1", 50),
+        entry("1", "s2", 30)
       )
     }
 
@@ -129,8 +127,8 @@ class CsvFileDataSourceTest extends AnyWordSpec with Matchers {
           .unsafeRunSync()
 
       resultingEntries shouldBe List(
-        Entry(SourceId1, SensorId("s2"), Measurement.Value(0)),
-        Entry(SourceId1, SensorId("s4"), Measurement.Value(100))
+        entry("1", "s2", 0),
+        entry("1", "s4", 100)
       )
     }
   }

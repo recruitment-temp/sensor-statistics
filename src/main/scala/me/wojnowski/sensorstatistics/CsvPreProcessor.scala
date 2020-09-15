@@ -12,7 +12,7 @@ import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import me.wojnowski.sensorstatistics.domain.SourceId
 
-class CsvDataPreProcessor[F[_]: Sync] extends RawDataPreProcessor[F, String] {
+class CsvPreProcessor[F[_]: Sync] extends RawDataPreProcessor[F, String] {
   implicit val logger: Logger[F] = Slf4jLogger.getLogger[F]
 
   override def preProcessPipe(sourceId: SourceId): Pipe[F, String, Entry] =

@@ -25,17 +25,16 @@ object Main extends IOApp {
 
   private val blocker = Blocker.liftExecutorService(Executors.newCachedThreadPool())
 
+  val preProcessor = new CsvPreProcessor[IO]
+
   override def run(arguments: List[String]): IO[ExitCode] =
     validateArguments[IO](arguments)
       .flatTap(path => Logger[IO].info(s"Reading data from [$path]..."))
       .flatTap { path =>
-        new CsvFileDataSource[IO](
-          path,
-          blocker,
-          chunkSize = ChunkSize,
-          maxParallelFiles = MaxParallelFiles,
-          new CsvDataPreProcessor[IO]
-        )
+
+
+        DataSource
+          .fromSourceAndPreProcessor(new FileDataSource[IO](path, ChunkSize, blocker), preProcessor, MaxParallelFiles)
           .streamData
           .through(DataProcessors.aggregate)
           .evalTap(metric => IO(println(metric.show)))

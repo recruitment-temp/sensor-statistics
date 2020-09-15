@@ -3,35 +3,29 @@ package me.wojnowski.sensorstatistics
 import java.nio.file.Path
 
 import cats.effect.Blocker
-import cats.effect.Concurrent
 import cats.effect.ContextShift
 import cats.effect.Sync
-import cats.syntax.all._
 import fs2.Stream
 import io.chrisdavenport.log4cats.Logger
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
-import me.wojnowski.sensorstatistics.domain.Entry
 import me.wojnowski.sensorstatistics.domain.SourceId
+import cats.syntax.all._
+import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 
-class CsvFileDataSource[F[_]: Concurrent: ContextShift](
+class FileDataSource[F[_]: Sync: ContextShift](
   directory: Path,
-  blocker: Blocker,
   chunkSize: Int,
-  maxParallelFiles: Int,
-  rawDataPreProcessor: RawDataPreProcessor[F, String]
-) extends DataSource[F] {
+  blocker: Blocker
+) extends RawDataSource[F, String] {
 
   implicit val logger: Logger[F] = Slf4jLogger.getLogger[F]
 
-  override def streamData: fs2.Stream[F, Entry] =
+  override def streamRawData: fs2.Stream[F, (SourceId, fs2.Stream[F, String])] =
     streamFilePaths
-      .map { path =>
+      .flatMap { path =>
         Stream
           .eval(Logger[F].info(s"Reading CSV file [$path]..."))
-          .evalMap(_ => pathToSourceId(path))
-          .flatMap(sourceId => readFile(path).through(rawDataPreProcessor.preProcessPipe(sourceId)))
+          .flatMap(_ => Stream.eval(pathToSourceId(path)).map((_, readFile(path))))
       }
-      .parJoin(maxParallelFiles)
 
   private def streamFilePaths: Stream[F, Path] =
     fs2
