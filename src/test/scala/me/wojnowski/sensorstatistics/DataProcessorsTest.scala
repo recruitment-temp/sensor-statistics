@@ -21,7 +21,6 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
 
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
-  // TODO how about some property-based testing?
   "Summary calculator" when {
     "processing data" should {
       "correctly calculate min, avg and max" in {
@@ -33,10 +32,11 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
 
         val resultingSummaries =
           Stream
-            .emits(entries)
+            .emits[IO, Entry](entries)
             .through(DataProcessors.calculateSummaries)
             .compile
             .toList
+            .unsafeRunSync()
             .flatMap(_.data.map { case (_, summary) => summary })
 
         resultingSummaries should contain theSameElementsAs List(
@@ -54,13 +54,16 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
 
         val resultingSummaries =
           Stream
-            .emits(entries)
+            .emits[IO, Entry](entries)
             .through(DataProcessors.calculateSummaries)
             .compile
             .toList
+            .unsafeRunSync()
             .flatMap(_.data.map { case (_, summary) => summary })
 
-        resultingSummaries shouldBe SensorSummary(min = Measurement.Value(50), avg = Measurement.Value(50), max = Measurement.Value(50))
+        resultingSummaries shouldBe List(
+          SensorSummary(min = Measurement.Value(50), avg = Measurement.Value(50), max = Measurement.Value(50))
+        )
       }
 
       "return NaNs if all measurements were NaNs" in {
@@ -68,10 +71,11 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
 
         val resultingSummaries =
           Stream
-            .emit(entry)
+            .emit[IO, Entry](entry)
             .through(DataProcessors.calculateSummaries)
             .compile
             .toList
+            .unsafeRunSync()
             .flatMap(_.data.map { case (_, summary) => summary })
 
         resultingSummaries.head shouldBe SensorSummary(min = Measurement.NaN, avg = Measurement.NaN, max = Measurement.NaN)
@@ -100,10 +104,11 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
 
         val resultingSummaries =
           Stream
-            .emits(entries)
+            .emits[IO, Entry](entries)
             .through(DataProcessors.calculateSummaries)
             .compile
             .toList
+            .unsafeRunSync()
             .flatMap(_.data)
 
         resultingSummaries should contain theSameElementsAs List(
@@ -226,24 +231,6 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
       }
 
     }
-
-    "count files without entries" in {
-      /*val entries = List.empty[Entry]
-
-      val resultingMetrics: List[Metric] =
-        Stream
-          .emits(entries)
-          .through(DataProcessors.countMeasurements)
-          .compile
-          .toList
-
-      resultingMetrics should contain theSameElementsAs List(
-        Metric.MeasurementsProcessed(successful = 0, failed = 0),
-      )*/
-
-      // TODO that won't work :/
-      fail()
-    }
   }
 
   "processing zero files" should {
@@ -285,11 +272,13 @@ class DataProcessorsTest extends AnyWordSpec with Matchers {
         resultingMetrics should contain theSameElementsAs List(
           Metric.ProcessedFiles(3),
           Metric.MeasurementsProcessed(successful = 3, failed = 2),
-          Metric.ResultPerSensor(List(
-            SensorId("s1") -> SensorSummary(min = Measurement.Value(60), avg = Measurement.Value(65), max = Measurement.Value(70)),
-            SensorId("s2") -> SensorSummary(min = Measurement.Value(50), avg = Measurement.Value(50), max = Measurement.Value(50)),
-            SensorId("s3") -> SensorSummary(min = Measurement.NaN, avg = Measurement.NaN, max = Measurement.NaN)
-          ))
+          Metric.ResultPerSensor(
+            List(
+              SensorId("s1") -> SensorSummary(min = Measurement.Value(60), avg = Measurement.Value(65), max = Measurement.Value(70)),
+              SensorId("s2") -> SensorSummary(min = Measurement.Value(50), avg = Measurement.Value(50), max = Measurement.Value(50)),
+              SensorId("s3") -> SensorSummary(min = Measurement.NaN, avg = Measurement.NaN, max = Measurement.NaN)
+            )
+          )
         )
       }
     }

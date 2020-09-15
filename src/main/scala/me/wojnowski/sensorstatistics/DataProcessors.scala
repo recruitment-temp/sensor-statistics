@@ -1,8 +1,8 @@
 package me.wojnowski.sensorstatistics
 
 import cats.effect.Concurrent
+import cats.effect.Sync
 import fs2.Pipe
-import me.wojnowski.sensorstatistics.DataProcessors.IntermediateSummary
 import me.wojnowski.sensorstatistics.domain.Entry
 import me.wojnowski.sensorstatistics.domain.Measurement
 import me.wojnowski.sensorstatistics.domain.Metric
@@ -11,6 +11,9 @@ import me.wojnowski.sensorstatistics.domain.SensorId
 import me.wojnowski.sensorstatistics.domain.SensorSummary
 import me.wojnowski.sensorstatistics.domain.SourceId
 import cats.syntax.all._
+
+import scala.util.Success
+import scala.util.Try
 
 object DataProcessors {
 
@@ -29,12 +32,12 @@ object DataProcessors {
   def countMeasurements[F[_]]: Pipe[F, Entry, Metric] =
     _.fold(MeasurementsProcessed(0, 0)) {
       case (metric, Entry(_, _, Measurement.NaN)) =>
-        metric.copy(failed = metric.failed + 1)
+        MeasurementsProcessed.failed.modify(_ + 1)(metric)
       case (metric, _)                            =>
-        metric.copy(successful = metric.successful + 1) // TODO lenses
+        MeasurementsProcessed.successful.modify(_ + 1)(metric)
     }
 
-  def calculateSummaries[F[_]]: Pipe[F, Entry, Metric.ResultPerSensor] =
+  def calculateSummaries[F[_]: Sync]: Pipe[F, Entry, Metric.ResultPerSensor] =
     _.fold(Map.empty[SensorId, IntermediateSummary]) {
       case (sensors, Entry(_, sensorId, Measurement.NaN))                =>
         sensors.updatedWith(sensorId) {
@@ -62,15 +65,14 @@ object DataProcessors {
               )
             )
         }
-    }.map { sensorIdToIntermediateSummary =>
-      Metric.ResultPerSensor(
-        sensorIdToIntermediateSummary
-          .toList
-          .map {
-            case (sensorId, intermediateSummary) =>
-              sensorId -> SensorSummary(intermediateSummary.min, intermediateSummary.avg, intermediateSummary.max)
-          }
-      )
+    }.evalMap { sensorIdToIntermediateSummary =>
+      sensorIdToIntermediateSummary
+        .toList
+        .traverse {
+          case (sensorId, intermediateSummary) =>
+            Sync[F].fromTry(intermediateSummary.toSensorSummary.map(sensorId -> _))
+        }
+        .map(Metric.ResultPerSensor.apply)
     }
 
   def sortSummaries[F[_]]: Pipe[F, Metric.ResultPerSensor, Metric.ResultPerSensor] =
@@ -88,11 +90,15 @@ object DataProcessors {
 
   private case class IntermediateSummary(min: Measurement, max: Measurement, sum: BigInt, count: BigInt) {
 
-    def avg: Measurement =
-      if (count > 0)
-        Measurement.ofInt((sum / count).toInt).getOrElse(Measurement.NaN) // TODO this is programmers error
-      else
-        Measurement.NaN
+    def toSensorSummary: Try[SensorSummary] = {
+      val avgEither =
+        if (count > 0)
+          Measurement.ofInt((sum / count).toInt).leftMap(new IllegalStateException(_)).toTry
+        else
+          Success(Measurement.NaN)
+
+      avgEither.map(avg => SensorSummary(min, avg, max))
+    }
 
   }
 

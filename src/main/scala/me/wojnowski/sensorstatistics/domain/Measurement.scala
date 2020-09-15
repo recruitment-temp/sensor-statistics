@@ -12,7 +12,6 @@ sealed trait Measurement extends Product with Serializable
 object Measurement {
   case object NaN extends Measurement
 
-  // TODO I'm not sure this is a good idea
   case class Value(value: Int Refined Interval.Closed[W.`0`.T, W.`100`.T]) extends Measurement
 
   object Value {

@@ -11,7 +11,6 @@ import cats.syntax.all._
 import fs2.Chunk
 import fs2.Pipe
 
-// TODO source ID is lost here :/
 class DirectoryRawDataSource[F[_]: Sync: ContextShift](directory: Path, blocker: Blocker, chunkSize: Int) extends RawDataSource[F, Char] {
 
   override def streamRawData: fs2.Stream[F, Char] =
